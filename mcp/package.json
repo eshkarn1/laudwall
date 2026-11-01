@@ -1,0 +1,21 @@
+{
+  "name": "laudwall-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Laudwall: let AI agents read, approve and embed your testimonials.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "bin": {
+    "laudwall-mcp": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "client.mjs"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "^3.25.76"
+  }
+}

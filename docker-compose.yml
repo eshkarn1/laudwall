@@ -1,0 +1,10 @@
+services:
+  laudwall:
+    build: .
+    ports: ["3051:3051"]
+    volumes: ["./data:/app/data"]
+    environment:
+      LAUDWALL_URL: http://localhost:3051   # the public address people reach it at
+      # LAUDWALL_SIGNUPS: "off"              # close sign-ups once your account exists
+      # LAUDWALL_BRANDING: "off"             # hide "Powered by Laudwall" on widgets
+    restart: unless-stopped
