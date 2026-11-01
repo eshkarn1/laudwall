@@ -1,27 +1,29 @@
 import { db } from "./db";
 import { hashPassword, sha256, token, verifyPassword } from "./crypto";
+import { limits } from "./plans";
+import { removeUpload } from "./media";
 import type { SpaceInput, TestimonialInput, TestimonialPatch } from "./validate";
 
 // All reads and writes. Every query that touches a space checks it belongs to the user asking.
 
-export type User = { id: number; email: string; name: string };
+export type User = { id: number; email: string; name: string; plan: string };
 export type Space = {
   id: number; user_id: number; slug: string; name: string; question: string; thank_you: string; accent: string; created_at: string;
+  hide_branding: number; webhook_url: string;
 };
 export type Testimonial = {
   id: number; space_id: number; author: string; role: string; body: string; rating: number; source: string;
-  status: "pending" | "approved" | "rejected"; featured: number; created_at: string;
+  status: "pending" | "approved" | "rejected"; featured: number; created_at: string; photo: string; video: string;
 };
 export type Status = Testimonial["status"];
 
 const SESSION_DAYS = 30;
-export const FREE_LIMIT = Number(process.env.LAUDWALL_FREE_LIMIT ?? 0); // 0 = unlimited (self-hosted)
 
 // -- users and sessions --------------------------------------------------------------
 export function createUser(name: string, email: string, password: string): User | null {
   try {
     const r = db().prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)").run(name, email, hashPassword(password));
-    return { id: Number(r.lastInsertRowid), email, name };
+    return { id: Number(r.lastInsertRowid), email, name, plan: "free" };
   } catch (e) {
     if (String(e).includes("UNIQUE")) return null;
     throw e;
@@ -29,11 +31,11 @@ export function createUser(name: string, email: string, password: string): User 
 }
 
 export function authenticate(email: string, password: string): User | null {
-  const row = db().prepare("SELECT id, email, name, password_hash FROM users WHERE email = ?").get(email) as
+  const row = db().prepare("SELECT id, email, name, plan, password_hash FROM users WHERE email = ?").get(email) as
     | (User & { password_hash: string })
     | undefined;
   if (!row || !verifyPassword(password, row.password_hash)) return null;
-  return { id: row.id, email: row.email, name: row.name };
+  return { id: row.id, email: row.email, name: row.name, plan: row.plan };
 }
 
 export function createSession(userId: number): { token: string; expires: Date } {
@@ -46,7 +48,7 @@ export function createSession(userId: number): { token: string; expires: Date } 
 export function userForSession(t: string | undefined): User | null {
   if (!t) return null;
   const row = db()
-    .prepare("SELECT u.id, u.email, u.name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?")
+    .prepare("SELECT u.id, u.email, u.name, u.plan FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?")
     .get(sha256(t), new Date().toISOString()) as User | undefined;
   return row ?? null;
 }
@@ -75,7 +77,7 @@ export function deleteApiKey(userId: number, id: number): void {
 export function userForApiKey(key: string | undefined): User | null {
   if (!key?.startsWith("lw_")) return null;
   const h = sha256(key);
-  const row = db().prepare("SELECT u.id, u.email, u.name FROM api_keys k JOIN users u ON u.id = k.user_id WHERE k.key_hash = ?").get(h) as
+  const row = db().prepare("SELECT u.id, u.email, u.name, u.plan FROM api_keys k JOIN users u ON u.id = k.user_id WHERE k.key_hash = ?").get(h) as
     | User
     | undefined;
   if (row) db().prepare("UPDATE api_keys SET last_used_at = datetime('now') WHERE key_hash = ?").run(h);
@@ -83,7 +85,10 @@ export function userForApiKey(key: string | undefined): User | null {
 }
 
 // -- spaces --------------------------------------------------------------------------
-export function createSpace(userId: number, s: SpaceInput): Space | null {
+/** null when the slug is taken; "limit" when the plan has no room for another space. */
+export function createSpace(userId: number, s: SpaceInput): Space | null | "limit" {
+  const { n } = db().prepare("SELECT COUNT(*) AS n FROM spaces WHERE user_id = ?").get(userId) as { n: number };
+  if (n >= limits(planOf(userId)).spaces) return "limit";
   try {
     const r = db()
       .prepare("INSERT INTO spaces (user_id, slug, name, question, thank_you, accent) VALUES (?, ?, ?, ?, ?, ?)")
@@ -101,8 +106,39 @@ export function updateSpace(userId: number, id: number, s: Omit<SpaceInput, "slu
     .run(s.name, s.question, s.thankYou, s.accent, id, userId);
 }
 
+export function updateSpaceExtras(userId: number, id: number, x: { hideBranding: boolean; webhookUrl: string }): void {
+  const hide = x.hideBranding && limits(planOf(userId)).whiteLabel;
+  db().prepare("UPDATE spaces SET hide_branding = ?, webhook_url = ? WHERE id = ? AND user_id = ?").run(Number(hide), x.webhookUrl, id, userId);
+}
+
+/** Whether a space's widget and pages show "Powered by Laudwall". */
+export function showBranding(space: Space): boolean {
+  if (process.env.LAUDWALL_BRANDING === "off") return false;
+  return !(space.hide_branding && limits(planOf(space.user_id)).whiteLabel);
+}
+
+// -- plans and billing -----------------------------------------------------------------
+export function planOf(userId: number): string {
+  return (db().prepare("SELECT plan FROM users WHERE id = ?").get(userId) as { plan: string } | undefined)?.plan ?? "free";
+}
+
+export function setPlan(userId: number, plan: string, stripeCustomer?: string): void {
+  db().prepare("UPDATE users SET plan = ?, stripe_customer = COALESCE(?, stripe_customer) WHERE id = ?").run(plan, stripeCustomer ?? null, userId);
+}
+
+export function userByStripeCustomer(customer: string): number | null {
+  return (db().prepare("SELECT id FROM users WHERE stripe_customer = ?").get(customer) as { id: number } | undefined)?.id ?? null;
+}
+
+export function stripeCustomerOf(userId: number): string | null {
+  return (db().prepare("SELECT stripe_customer FROM users WHERE id = ?").get(userId) as { stripe_customer: string | null } | undefined)?.stripe_customer ?? null;
+}
+
 export function deleteSpace(userId: number, id: number): void {
+  const files = db().prepare("SELECT t.photo, t.video FROM testimonials t JOIN spaces s ON s.id = t.space_id WHERE s.id = ? AND s.user_id = ?")
+    .all(id, userId) as { photo: string; video: string }[];
   db().prepare("DELETE FROM spaces WHERE id = ? AND user_id = ?").run(id, userId);
+  for (const f of files) (removeUpload(f.photo), removeUpload(f.video));
 }
 
 export function getSpace(userId: number, idOrSlug: number | string): Space | null {
@@ -125,14 +161,17 @@ export function listSpaces(userId: number) {
 }
 
 // -- testimonials --------------------------------------------------------------------
-export function addTestimonial(spaceId: number, t: TestimonialInput, source = "form", status: Status = "pending"): Testimonial | null {
-  if (FREE_LIMIT) {
-    const { n } = db().prepare("SELECT COUNT(*) AS n FROM testimonials WHERE space_id = ?").get(spaceId) as { n: number };
-    if (n >= FREE_LIMIT) return null;
-  }
+export type Media = { photo?: string; video?: string };
+
+/** null when the space's plan is full. */
+export function addTestimonial(spaceId: number, t: TestimonialInput, source = "form", status: Status = "pending", media: Media = {}): Testimonial | null {
+  const owner = db().prepare("SELECT user_id FROM spaces WHERE id = ?").get(spaceId) as { user_id: number } | undefined;
+  if (!owner) return null;
+  const { n } = db().prepare("SELECT COUNT(*) AS n FROM testimonials WHERE space_id = ?").get(spaceId) as { n: number };
+  if (n >= limits(planOf(owner.user_id)).testimonials) return null;
   const r = db()
-    .prepare("INSERT INTO testimonials (space_id, author, role, body, rating, source, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .run(spaceId, t.author, t.role, t.body, t.rating, source, status);
+    .prepare("INSERT INTO testimonials (space_id, author, role, body, rating, source, status, photo, video) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(spaceId, t.author, t.role, t.body, t.rating, source, status, media.photo ?? "", media.video ?? "");
   return db().prepare("SELECT * FROM testimonials WHERE id = ?").get(Number(r.lastInsertRowid)) as Testimonial;
 }
 
@@ -172,7 +211,10 @@ export function updateTestimonial(userId: number, id: number, patch: Testimonial
 }
 
 export function deleteTestimonial(userId: number, id: number): boolean {
-  if (!getTestimonial(userId, id)) return false;
+  const t = getTestimonial(userId, id);
+  if (!t) return false;
   db().prepare("DELETE FROM testimonials WHERE id = ?").run(id);
+  removeUpload(t.photo);
+  removeUpload(t.video);
   return true;
 }

@@ -16,5 +16,6 @@ export async function POST(req: Request) {
   const parsed = spaceSchema.safeParse(await body(req));
   if (!parsed.success) return invalid(parsed.error);
   const space = createSpace(user.id, parsed.data);
+  if (space === "limit") return error(402, "Your plan has no room for another space");
   return space ? json({ space: spaceOut(space) }, 201) : error(409, `The slug "${parsed.data.slug}" is taken`);
 }

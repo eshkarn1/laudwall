@@ -3,7 +3,8 @@
 //   node scripts/e2e.mjs [screenshot dir]
 // Needs puppeteer-core (PUPPETEER_CORE=path/to/puppeteer-core) and Google Chrome. Use a throwaway LAUDWALL_DB.
 import { createServer } from "node:http";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -13,6 +14,10 @@ const OUT = process.argv[2] ?? "e2e-shots";
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const puppeteer = createRequire(import.meta.url)(process.env.PUPPETEER_CORE ?? "puppeteer-core");
 mkdirSync(OUT, { recursive: true });
+// a real photo and a one-second video for the customer to upload
+const PHOTO = join(OUT, "face.png"), VIDEO = join(OUT, "hello.mp4");
+writeFileSync(PHOTO, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=320x400:rate=24", "-t", "1", "-pix_fmt", "yuv420p", VIDEO]);
 
 const stamp = Date.now().toString(36);
 const email = `owner-${stamp}@example.com`;
@@ -58,6 +63,8 @@ try {
   await cust.type("#body", "The sourdough is the best in town and they made our wedding cake on two days' notice.");
   await cust.type("#author", "Priya Patel");
   await cust.type("#role", "Owner, Bloom Florals");
+  await (await cust.$("#photo")).uploadFile(PHOTO);
+  await (await cust.$("#video")).uploadFile(VIDEO);
   await cust.click('input[name="consent"]');
   await Promise.all([cust.waitForSelector('[role="status"]'), cust.click("form button.primary")]);
   check((await cust.$eval('[role="status"]', (e) => e.textContent)).includes("Thank you"), "customer submission is thanked");
@@ -66,6 +73,10 @@ try {
 
   await go(`/dashboard/${slug}`);
   check((await page.content()).includes("Priya Patel"), "submission appears in the waiting tab");
+  check(Boolean(await page.$('article video[src^="/media/"]')) && Boolean(await page.$('article img[src^="/media/"]')), "photo and video arrive with it");
+  const media = await page.$eval("article video", (v) => v.getAttribute("src").split("#")[0]);
+  const ranged = await page.evaluate(async (u) => { const r = await fetch(u, { headers: { range: "bytes=0-99" } }); return [r.status, r.headers.get("content-type")]; }, media);
+  check(ranged[0] === 206 && ranged[1] === "video/mp4", `video streams with range requests (${ranged.join(" ")})`);
   await shot("inbox-pending");
   await submit("article form button.primary"); // Approve
   await go(`/dashboard/${slug}?tab=approved`);
@@ -82,6 +93,12 @@ try {
   check((await page.$eval('[role="status"]', (e) => e.textContent)).includes("Marcus"), "manual import is confirmed");
   await go(`/dashboard/${slug}?tab=approved`);
   await shot("inbox-approved");
+
+  const csv = await page.evaluate(async (u) => (await fetch(u)).text(), `/dashboard/${slug}/export`);
+  check(csv.includes("author,role,body") && csv.includes("Marcus Lee"), "CSV export downloads every testimonial");
+  await page.type("#x-hook", "http://localhost/hook");
+  await Promise.all([page.waitForSelector('[role="alert"]'), page.click("form:has(#x-hook) button")]);
+  check((await page.$eval('[role="alert"]', (e) => e.textContent)).includes("https"), "a non-https webhook is refused");
 
   await go("/dashboard/settings");
   await page.type('input[name="name"]', "e2e");
@@ -124,6 +141,8 @@ try {
   await page.goto("http://localhost:3999", { waitUntil: "networkidle0" });
   const cards = await page.$$eval("[data-laudwall]", (els) => els.map((e) => e.shadowRoot?.querySelectorAll(".card").length ?? -1));
   check(cards[0] === 3 && cards[1] === 3, `widget renders on a foreign site (cards: ${cards.join(", ")})`);
+  const rich = await page.$eval("[data-laudwall]", (e) => [e.shadowRoot.querySelectorAll("video").length, e.shadowRoot.querySelectorAll("img.avatar").length]);
+  check(rich[0] === 1 && rich[1] === 1, "widget shows the customer's video and photo");
   const badge = await page.$eval('[data-layout="badge"]', (e) => e.shadowRoot?.textContent ?? "");
   check(badge.includes("from 3 reviews"), "badge shows the average");
   await shot("widget-on-foreign-site");

@@ -9,8 +9,10 @@ export const WIDGET_JS = String.raw`(function () {
   var stars = function (n) { return '<span class="stars" aria-label="' + n + ' out of 5">' + '★★★★★'.slice(0, n) + '<i>' + '★★★★★'.slice(n) + '</i></span>'; };
   var initials = function (name) { return esc(name.split(/\s+/).map(function (w) { return w[0]; }).slice(0, 2).join('').toUpperCase()); };
   var card = function (t) {
-    return '<figure class="card' + (t.featured ? ' featured' : '') + '">' + stars(t.rating) + '<blockquote>' + esc(t.body) + '</blockquote>' +
-      '<figcaption><span class="avatar">' + initials(t.author) + '</span><span><b>' + esc(t.author) + '</b>' + (t.role ? '<small>' + esc(t.role) + '</small>' : '') + '</span></figcaption></figure>';
+    var avatar = t.photo ? '<img class="avatar" src="' + esc(t.photo) + '" alt="" loading="lazy">' : '<span class="avatar">' + initials(t.author) + '</span>';
+    var video = t.video ? '<video src="' + esc(t.video) + '#t=0.1" controls playsinline preload="metadata"></video>' : '';
+    return '<figure class="card' + (t.featured ? ' featured' : '') + '">' + video + stars(t.rating) + '<blockquote>' + esc(t.body) + '</blockquote>' +
+      '<figcaption>' + avatar + '<span><b>' + esc(t.author) + '</b>' + (t.role ? '<small>' + esc(t.role) + '</small>' : '') + '</span></figcaption></figure>';
   };
   var css = function (accent) {
     return ':host{all:initial;display:block;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2330;--a:' + accent + '}' +
@@ -18,7 +20,8 @@ export const WIDGET_JS = String.raw`(function () {
       '.featured{border-color:var(--a);box-shadow:0 0 0 1px var(--a)}.stars{color:#f5a524;letter-spacing:2px;font-size:14px}.stars i{color:#d9dce4;font-style:normal}' +
       'blockquote{margin:8px 0 14px;white-space:pre-line}figcaption{display:flex;gap:10px;align-items:center}figcaption small{display:block;color:#6b7080;font-size:13px}' +
       '.avatar{flex:none;width:36px;height:36px;border-radius:50%;background:var(--a);color:#fff;display:grid;place-items:center;font-weight:600;font-size:13px}' +
-      '.carousel{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}.carousel .card{flex:0 0 min(340px,85%);scroll-snap-align:start;margin:0}' +
+      'img.avatar{object-fit:cover;display:block}video{display:block;width:100%;border-radius:10px;margin:0 0 12px;background:#000;aspect-ratio:9/12;object-fit:cover}' +
+      '.carousel{display:flex;align-items:flex-start;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}.carousel .card{flex:0 0 min(340px,85%);scroll-snap-align:start;margin:0}' +
       '.badge{display:inline-flex;gap:10px;align-items:center;padding:10px 16px;border:1px solid #e6e8ef;border-radius:999px;background:#fff;text-decoration:none;color:inherit}.badge b{font-size:18px}' +
       '.by{display:block;margin-top:8px;text-align:right;font-size:12px;color:#8a8f9e;text-decoration:none}.by:hover{color:var(--a)}.empty{color:#8a8f9e}';
   };

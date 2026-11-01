@@ -3,10 +3,12 @@
 The open-source testimonial wall. Collect testimonials with a link, approve them in one inbox, and embed them on any
 website. Free to self-host, with a REST API and an MCP server, so AI agents can use it too.
 
-- **Collect:** a public page per space (`/c/<space>`): text, rating, name, role, consent. Spam honeypot and rate limits.
+- **Collect:** a public page per space (`/c/<space>`): text, rating, name, role, photo, video, consent. Spam honeypot and rate limits.
 - **Approve:** waiting / approved / rejected inbox, feature the best ones, search, add testimonials you already have.
 - **Show:** a hosted wall (`/w/<space>`) and an embeddable widget with three layouts: wall, carousel, star badge.
-- **Automate:** REST API with revocable keys, and `laudwall-mcp` for Claude and other MCP clients.
+- **Automate:** REST API with revocable keys, `laudwall-mcp` for Claude and other MCP clients, webhooks for Slack, Zapier and n8n.
+- **Move data:** CSV import and export per space.
+- **Run a cloud:** optional plans (Free / Pro / Agency) with Stripe billing, off unless you turn it on.
 
 ## Run it
 
@@ -26,7 +28,22 @@ pnpm install && pnpm build && pnpm start
 | `LAUDWALL_DB` | `data/laudwall.db` | SQLite file. Back it up and you have everything |
 | `LAUDWALL_SIGNUPS` | on | `off` closes sign-ups once your account exists |
 | `LAUDWALL_BRANDING` | on | `off` hides "Powered by Laudwall" on widgets |
-| `LAUDWALL_FREE_LIMIT` | `0` (unlimited) | Testimonials per space, for a hosted free tier |
+| `LAUDWALL_UPLOADS` | `uploads/` next to the database | Where photos and videos are stored |
+| `LAUDWALL_CLOUD` | off | `on` turns on plans and limits, for running Laudwall as a hosted service |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_AGENCY` | unset | Cloud billing. Point a Stripe webhook at `/api/stripe/webhook` with `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted` |
+| `LAUDWALL_ALLOW_PRIVATE_WEBHOOKS` | off | `on` lets webhooks reach private addresses (a self-hosted n8n on your LAN) |
+
+### Plans (cloud mode only)
+
+| | Free | Pro ($12/mo) | Agency ($39/mo) |
+|---|---|---|---|
+| Spaces | 1 | 3 | Unlimited |
+| Testimonials | 15 | Unlimited | Unlimited |
+| Photo and video | | Yes | Yes |
+| Hide the badge | | Yes | Yes |
+| API and MCP | | Yes | Yes |
+
+A self-hosted server has every feature with no limits.
 
 ## Embed
 
@@ -53,7 +70,14 @@ Create a key under **API & MCP** and send it as `Authorization: Bearer lw_...`.
 | GET / PATCH / DELETE | `/api/v1/testimonials/:id` | PATCH: `{status?, featured?, author?, role?, body?}` |
 | GET | `/api/public/:slug` | No key. Approved testimonials, CORS open (what the widget reads) |
 
-Errors are `{"error": {"message", "details"?}}` with a matching status code. 120 requests a minute per IP.
+Testimonials include `photo` and `video` URLs (or `null`). Errors are `{"error": {"message", "details"?}}` with a
+matching status code: 401 bad key, 402 plan limit, 404, 409 slug taken, 429 rate limit (120 a minute per IP).
+
+## Webhooks
+
+Set a URL under a space's **Notifications and branding**. Every new testimonial is POSTed as JSON:
+`{event: "testimonial.created", text, space, testimonial}`. `text` is ready for a Slack incoming webhook. HTTPS only,
+5-second timeout, never retried; private addresses are refused unless `LAUDWALL_ALLOW_PRIVATE_WEBHOOKS=on`.
 
 ## MCP server
 

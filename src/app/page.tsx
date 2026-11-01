@@ -14,11 +14,12 @@ const COMPARE: [string, string, string, string][] = [
   ["Your data in one SQLite file", "Yes", "No", "No"],
   ["REST API", "Yes", "Higher plans", "Higher plans"],
   ["MCP server for AI agents", "Yes", "No", "No"],
+  ["Webhooks (Slack, Zapier, n8n)", "Yes", "Higher plans", "Higher plans"],
 ];
 
 const PLANS = [
   { name: "Self-hosted", price: "$0", per: "forever", items: ["Everything, unlimited", "One Docker container", "Your data never leaves your server"], cta: "Self-host it", href: "#self-host" },
-  { name: "Cloud Pro", price: "$12", per: "/month", items: ["Unlimited testimonials", "3 spaces", "No Laudwall badge", "API + MCP"], cta: "Start free", href: "/signup", best: true },
+  { name: "Cloud Pro", price: "$12", per: "/month", items: ["Unlimited testimonials", "3 spaces", "Photo and video testimonials", "No Laudwall badge", "API + MCP"], cta: "Start free", href: "/signup", best: true },
   { name: "Cloud Agency", price: "$39", per: "/month", items: ["Unlimited spaces", "White-label collect pages", "For studios running client sites"], cta: "Start free", href: "/signup" },
 ];
 

@@ -49,6 +49,13 @@ const MIGRATIONS = [
      last_used_at TEXT,
      created_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+  // v1.1: plans and billing, white label, webhooks, photo and video testimonials
+  `ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free';
+   ALTER TABLE users ADD COLUMN stripe_customer TEXT;
+   ALTER TABLE spaces ADD COLUMN hide_branding INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE spaces ADD COLUMN webhook_url TEXT NOT NULL DEFAULT '';
+   ALTER TABLE testimonials ADD COLUMN photo TEXT NOT NULL DEFAULT '';
+   ALTER TABLE testimonials ADD COLUMN video TEXT NOT NULL DEFAULT '';`,
 ];
 
 function open(): DatabaseSync {

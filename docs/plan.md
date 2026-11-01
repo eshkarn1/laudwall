@@ -91,10 +91,20 @@ Nothing is published, posted or launched without your approval.
 - [x] README with self-host, API and MCP setup; AGPL licence
 - [x] Real-browser check of every page
 
+## v1.1 — built 1 Nov 2026
+
+- [x] Plans and limits (Free / Pro / Agency), on only in cloud mode
+- [x] Stripe billing: checkout, customer portal, signed webhook keeps the plan in step
+- [x] Photo and video testimonials (file signature checked, range streaming for video)
+- [x] Webhooks on new testimonials (Slack-ready, private addresses refused)
+- [x] CSV import and export
+- [x] White label: hide the badge on paid plans
+- [x] GitHub Actions CI
+
 ## Later (v2)
 
-Video testimonials, import from Google/Trustpilot/X links, AI summary + best-quote highlighting, Stripe billing
-for the cloud version, team members, custom domains, white label.
+Team members per account, custom domains for collect pages and walls, import from public review links,
+an AI "best quote" highlight, email notifications (SMTP), in-browser video recording on desktop.
 
 ## Sources
 

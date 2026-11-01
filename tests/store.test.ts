@@ -41,7 +41,7 @@ describe("spaces and testimonials", () => {
   it("keeps one user's spaces and testimonials away from another", () => {
     const a = store.createUser("A", "a@example.com", "correct horse battery")!;
     const b = store.createUser("B", "b@example.com", "correct horse battery")!;
-    const s = store.createSpace(a.id, space("acme"))!;
+    const s = (store.createSpace(a.id, space("acme")) as store.Space);
     expect(store.createSpace(b.id, space("acme"))).toBeNull(); // slugs are global: they're public URLs
     const t = store.addTestimonial(s.id, words("Priya"))!;
     expect(store.getSpace(b.id, s.id)).toBeNull();
@@ -52,7 +52,7 @@ describe("spaces and testimonials", () => {
 
   it("shows only approved testimonials publicly, featured first", () => {
     const a = store.createUser("A", "a@example.com", "correct horse battery")!;
-    const s = store.createSpace(a.id, space("acme"))!;
+    const s = (store.createSpace(a.id, space("acme")) as store.Space);
     const [one, two, three] = ["One", "Two", "Three"].map((n) => store.addTestimonial(s.id, words(n))!);
     store.updateTestimonial(a.id, one.id, { status: "approved", featured: true });
     store.updateTestimonial(a.id, two.id, { status: "approved" });

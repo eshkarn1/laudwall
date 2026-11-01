@@ -77,7 +77,7 @@ describe("REST API v1", () => {
 describe("public feed and widget", () => {
   it("serves approved testimonials only, readable cross-origin", async () => {
     const u = store.userForApiKey(key)!;
-    const s = store.createSpace(u.id, { name: "Acme", slug: "acme", question: "Q?", thankYou: "Thanks", accent: "#112233" })!;
+    const s = store.createSpace(u.id, { name: "Acme", slug: "acme", question: "Q?", thankYou: "Thanks", accent: "#112233" }) as store.Space;
     store.addTestimonial(s.id, { author: "Approved", role: "", body: "Shown on the wall for sure.", rating: 5 }, "form", "approved");
     store.addTestimonial(s.id, { author: "Pending", role: "", body: "Not shown until approved.", rating: 4 });
     const res = await feed.GET(new Request(`${URL_}/api/public/acme`), slug("acme"));

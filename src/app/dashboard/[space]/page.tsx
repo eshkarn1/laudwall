@@ -4,8 +4,9 @@ import { ActionForm, Submit } from "@/components/ActionForm";
 import { Stars } from "@/components/bits";
 import { appUrl, embedCode } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
+import { limits } from "@/lib/plans";
 import { getSpace, listTestimonials, type Status } from "@/lib/store";
-import { deleteSpace, importTestimonial, removeTestimonial, setFeatured, setStatus, updateSpace } from "../../actions";
+import { deleteSpace, importCsv, importTestimonial, removeTestimonial, setFeatured, setStatus, updateSpace, updateSpaceExtras } from "../../actions";
 
 type Props = { params: Promise<{ space: string }>; searchParams: Promise<{ tab?: string; q?: string }> };
 const TABS: Status[] = ["pending", "approved", "rejected"];
@@ -48,8 +49,9 @@ export default async function SpacePage({ params, searchParams }: Props) {
                     <Stars n={t.rating} />
                     <span className="row">{t.featured ? <span className="pill">★ Featured</span> : null}<span className="pill">{t.source}</span><span className="muted small">{t.created_at.slice(0, 10)}</span></span>
                   </div>
+                  {t.video && <video src={`/media/${t.video}#t=0.1`} controls playsInline preload="metadata" style={{ width: "100%", maxWidth: 320, borderRadius: 10, marginTop: 10, background: "#000" }} />}
                   <p className="quote">{t.body}</p>
-                  <p className="small"><b>{t.author}</b>{t.role && <span className="muted"> · {t.role}</span>}</p>
+                  <p className="small row" style={{ gap: 8 }}>{t.photo && <img src={`/media/${t.photo}`} alt="" width={28} height={28} style={{ borderRadius: "50%", objectFit: "cover" }} />}<b>{t.author}</b>{t.role && <span className="muted"> · {t.role}</span>}</p>
                   <div className="row">
                     {t.status !== "approved" && <form action={setStatus.bind(null, t.id, "approved")}><button className="btn small primary">Approve</button></form>}
                     {t.status !== "rejected" && <form action={setStatus.bind(null, t.id, "rejected")}><button className="btn small">Reject</button></form>}
@@ -81,6 +83,29 @@ export default async function SpacePage({ params, searchParams }: Props) {
               <div className="field"><label htmlFor="i-role">Role and company</label><input id="i-role" name="role" maxLength={120} /></div>
               <div className="field"><label htmlFor="i-rating">Rating</label><select id="i-rating" name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((n) => <option key={n}>{n}</option>)}</select></div>
               <Submit className="btn">Add as approved</Submit>
+            </ActionForm>
+          </div>
+          <div className="panel">
+            <h3>Import and export</h3>
+            <p className="muted small">CSV with <code>author</code> and <code>body</code> columns (<code>role</code>, <code>rating</code> optional). Imports go straight to approved.</p>
+            <ActionForm action={importCsv.bind(null, space.id)} className="stack">
+              <input name="file" type="file" accept=".csv,text/csv" aria-label="CSV file" />
+              <div className="row"><Submit className="btn">Import CSV</Submit><a className="btn" href={`/dashboard/${space.slug}/export`}>Export all as CSV</a></div>
+            </ActionForm>
+          </div>
+          <div className="panel">
+            <h3>Notifications and branding</h3>
+            <ActionForm action={updateSpaceExtras.bind(null, space.id)} className="stack">
+              <div className="field">
+                <label htmlFor="x-hook">Webhook URL</label>
+                <input id="x-hook" name="webhookUrl" type="url" defaultValue={space.webhook_url} placeholder="https://hooks.slack.com/services/..." />
+                <p className="muted small">We POST every new testimonial here. Works with Slack, Zapier, Make and n8n.</p>
+              </div>
+              <label className="check">
+                <input type="checkbox" name="hideBranding" defaultChecked={Boolean(space.hide_branding)} disabled={!limits(user.plan).whiteLabel} />
+                Hide &ldquo;Powered by Laudwall&rdquo;{!limits(user.plan).whiteLabel && <span className="muted"> (Pro plan)</span>}
+              </label>
+              <Submit className="btn">Save</Submit>
             </ActionForm>
           </div>
           <div className="panel">

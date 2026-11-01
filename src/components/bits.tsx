@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/actions";
+import { isCloud } from "@/lib/plans";
 import type { User } from "@/lib/store";
 
 export function Stars({ n }: { n: number }) {
@@ -16,6 +17,7 @@ export function Header({ user }: { user: User | null }) {
             <>
               <Link href="/dashboard">Spaces</Link>
               <Link href="/dashboard/settings">API &amp; MCP</Link>
+              {isCloud() && <Link href="/dashboard/billing">Billing</Link>}
               <form action={logout}><button className="btn small">Log out</button></form>
             </>
           ) : (

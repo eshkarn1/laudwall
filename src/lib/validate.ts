@@ -40,6 +40,11 @@ export const testimonialPatchSchema = z
   .partial()
   .refine((p) => Object.keys(p).length > 0, "Nothing to update");
 
+export const spaceExtrasSchema = z.object({
+  hideBranding: z.preprocess((v) => v === "on" || v === true, z.boolean()),
+  webhookUrl: z.union([z.literal(""), z.string().trim().url("Enter a full URL, like https://hooks.slack.com/...").max(500)]).default(""),
+});
+
 export type SpaceInput = z.infer<typeof spaceSchema>;
 export type TestimonialInput = z.infer<typeof testimonialSchema>;
 export type TestimonialPatch = z.infer<typeof testimonialPatchSchema>;

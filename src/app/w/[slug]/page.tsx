@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Stars } from "@/components/bits";
-import { publicSpace, publicTestimonials } from "@/lib/store";
+import { publicSpace, publicTestimonials, showBranding } from "@/lib/store";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -25,14 +25,18 @@ export default async function Wall({ params }: Props) {
         <div style={{ columns: "3 280px", columnGap: 16 }}>
           {list.map((t) => (
             <figure key={t.id} className="panel" style={{ breakInside: "avoid", margin: "0 0 16px", ...(t.featured ? { borderColor: space.accent } : {}) }}>
+              {t.video && <video src={`/media/${t.video}#t=0.1`} controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 10, marginBottom: 10, background: "#000" }} />}
               <Stars n={t.rating} />
               <blockquote className="quote" style={{ marginInline: 0 }}>{t.body}</blockquote>
-              <figcaption><b>{t.author}</b>{t.role && <div className="muted small">{t.role}</div>}</figcaption>
+              <figcaption className="row" style={{ flexWrap: "nowrap" }}>
+                {t.photo && <img src={`/media/${t.photo}`} alt="" width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} />}
+                <span><b>{t.author}</b>{t.role && <span className="muted small" style={{ display: "block" }}>{t.role}</span>}</span>
+              </figcaption>
             </figure>
           ))}
         </div>
       )}
-      <footer>Collected with <a href="/">Laudwall</a></footer>
+      {showBranding(space) && <footer>Collected with <a href="/">Laudwall</a></footer>}
     </main>
   );
 }

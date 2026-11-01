@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { ZodError } from "zod";
 import { userForApiKey, type Space, type Testimonial, type User } from "./store";
 import { clientIp, limited } from "./limit";
+import { limits } from "./plans";
 
 // Helpers for the REST API: Bearer-key auth, JSON errors, and the shapes the API returns.
 
@@ -21,7 +22,9 @@ export function invalid(e: ZodError) {
 export function apiUser(req: Request): User | Response {
   if (limited(`api:${clientIp(req.headers)}`, 120, 60_000)) return error(429, "Too many requests: 120 a minute");
   const key = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  return userForApiKey(key) ?? error(401, "Send a valid API key: Authorization: Bearer lw_...");
+  const user = userForApiKey(key);
+  if (!user) return error(401, "Send a valid API key: Authorization: Bearer lw_...");
+  return limits(user.plan).api ? user : error(402, "The API and MCP server come with the Pro plan");
 }
 
 export async function body(req: Request): Promise<unknown> {
@@ -45,8 +48,12 @@ export function spaceOut(s: Space) {
 export function testimonialOut(t: Testimonial) {
   return {
     id: t.id, space_id: t.space_id, author: t.author, role: t.role, body: t.body, rating: t.rating, source: t.source,
-    status: t.status, featured: Boolean(t.featured), created_at: t.created_at,
+    status: t.status, featured: Boolean(t.featured), created_at: t.created_at, ...mediaOut(t),
   };
+}
+
+export function mediaOut(t: Testimonial) {
+  return { photo: t.photo ? `${appUrl()}/media/${t.photo}` : null, video: t.video ? `${appUrl()}/media/${t.video}` : null };
 }
 
 export function embedCode(slug: string, layout: "wall" | "carousel" | "badge" = "wall") {
