@@ -93,7 +93,7 @@ Set a URL under a space's **Notifications and branding**. Every new testimonial 
 }
 ```
 
-Before it is on npm, point `command` at `node` and `args` at `mcp/index.mjs` in this repo (run `pnpm install` in
+To run it from this repo instead, point `command` at `node` and `args` at `mcp/index.mjs` (run `pnpm install` in
 `mcp/` first). Tools: `list_spaces`, `list_testimonials`, `add_testimonial`, `update_testimonial`,
 `delete_testimonial`, `get_embed_code`, `create_space`.
 
